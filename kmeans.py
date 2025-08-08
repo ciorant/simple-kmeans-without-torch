@@ -6,17 +6,42 @@ import sys
 
 
 class KMeans:
-    def __init__(self, k, max_iter=160, convergence=1e-5):
+    def __init__(self, k, max_iter=160, convergence=1e-5, init_method='kmeans++'):
         self.k = k
         self.max_iter = max_iter
         self.convergence = convergence
         self.centroids = None
         self.labels = None
+        self.init_method = init_method
+
+    def _kmeans_plus_plus_init(self,data):
+        # K-means++ initialization
+        m,n = data.shape
+        centroids = np.zeros((self.k,n))
+        centroids[0] = data[np.random.choice(m)]
+
+        for i in range (1,self.k):
+            distance_squared = np.array([
+                min([np.linalg.norm(point-centroid)**2 for centroid in centroids[:1]])
+                for point in data
+            ])
+            probabilities = distance_squared / distance_squared.sum()
+            cumulative_prob = probabilities.cumsum()
+            random_val = np.random.rand()
+            chosen_idx = np.where(cumulative_prob >= random_val)[0][0]
+            centroids[i] = data[chosen_idx]
+
+        return centroids
 
     def fit(self, data):
         m, n = data.shape
-        indices = np.random.choice(m, self.k, replace=False)
-        self.centroids = data[indices]
+
+        if self.init_method == 'kmeans++':
+            self_centroids = self._kmeans_plus_plus_init(data)
+        else:
+            indices = np.random.choice(m, self.k, replace=False)
+            self.centroids = data[indices]
+
         self.labels = np.zeros(m, dtype=int)
 
         for iteration in range(self.max_iter):
@@ -54,9 +79,10 @@ class KMeans:
 
 
 class ImageCompressor:
-    def __init__(self, k_clusters=16):
+    def __init__(self, k_clusters=16,init_method='kmeans++'):
         self.k_clusters = k_clusters
-        self.kmeans = KMeans(k_clusters)
+        self.init_method = init_method
+        self.kmeans = KMeans(k_clusters,init_method=init_method)
         self.original_shape = None
 
     def load_image(self, filepath):
